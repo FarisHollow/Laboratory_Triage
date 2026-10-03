@@ -5,3 +5,14 @@ scikit-learn
 pypdf2
 pdfplumber
 python-multipart
+mongodb
+pymongo
+react-vite
+
+
+Backend start: 
+uvicorn app.main:app --reload
+
+Frontend start: 
+cd /home/mir-faris/Documents/projects/triage_assistant/frontend
+npm run dev

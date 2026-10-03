@@ -1,8 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from app.models import BatchLabReports, LabReport
-from app.rules import rule_based_triage
 
+from app.models import BatchLabReports
+from app.rules import rule_based_triage
+from database.mongodb import reports_collection
+
+from datetime import datetime
 import pickle
 import pandas as pd
 
@@ -13,7 +16,11 @@ app = FastAPI(
     version="0.1.0"
 )
 
+
+# --------------------------------------------------
 # CORS
+# --------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,18 +29,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load ML model
+
+# --------------------------------------------------
+# Load ML Model
+# --------------------------------------------------
+
 with open("models/gradient_boosting_model.pkl", "rb") as file:
     ml_model = pickle.load(file)
 
 
-# Label mapping
+# --------------------------------------------------
+# Label Mapping
+# --------------------------------------------------
+
 label_mapping = {
     0: "monitor",
     1: "normal",
     2: "urgent"
 }
 
+
+# --------------------------------------------------
+# Home
+# --------------------------------------------------
 
 @app.get("/")
 def home():
@@ -42,6 +60,10 @@ def home():
     }
 
 
+# --------------------------------------------------
+# Health Check
+# --------------------------------------------------
+
 @app.get("/health")
 def health_check():
     return {
@@ -49,6 +71,9 @@ def health_check():
     }
 
 
+# --------------------------------------------------
+# AI Triage
+# --------------------------------------------------
 
 @app.post("/triage")
 def triage(batch: BatchLabReports):
@@ -57,16 +82,34 @@ def triage(batch: BatchLabReports):
 
     for report in batch.reports:
 
-        # -----------------------
-        # Rule Based Prediction
-        # -----------------------
+        # ------------------------------------------
+        # Check if Report ID already exists
+        # ------------------------------------------
+
+        existing_report = reports_collection.find_one(
+            {
+                "report_id": report.report_id
+            }
+        )
+
+        if existing_report:
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"Report ID '{report.report_id}' already exists in Report History. Please use a different Report ID."
+            )
+
+
+        # ------------------------------------------
+        # Rule-Based Prediction
+        # ------------------------------------------
 
         rule_label, reasons = rule_based_triage(report)
 
 
-        # -----------------------
-        # ML Prediction
-        # -----------------------
+        # ------------------------------------------
+        # Prepare Data for ML Model
+        # ------------------------------------------
 
         data = pd.DataFrame([
             {
@@ -80,35 +123,168 @@ def triage(batch: BatchLabReports):
         ])
 
 
+        # ------------------------------------------
+        # ML Prediction
+        # ------------------------------------------
+
         prediction = ml_model.predict(data)
 
         ml_label = label_mapping[prediction[0]]
 
 
-        # -----------------------
-        # Confidence Score
-        # -----------------------
+        # ------------------------------------------
+        # ML Confidence
+        # ------------------------------------------
 
         probabilities = ml_model.predict_proba(data)
 
-        confidence = max(probabilities[0]) * 100
-        confidence = round(confidence, 2)
+        confidence = round(
+            max(probabilities[0]) * 100,
+            2
+        )
 
 
-        # -----------------------
-        # Store Result
-        # -----------------------
+        # ------------------------------------------
+        # Create Result
+        # ------------------------------------------
 
-        results.append({
+        result = {
             "report_id": report.report_id,
+
+            "lab_values": {
+                "hemoglobin": report.hemoglobin,
+                "wbc": report.wbc,
+                "creatinine": report.creatinine,
+                "sodium": report.sodium,
+                "potassium": report.potassium,
+                "platelet": report.platelet
+            },
+
             "triage_result": ml_label.capitalize(),
+
             "ml_prediction": ml_label.capitalize(),
+
             "ml_confidence": confidence,
+
             "rule_prediction": rule_label,
-            "risk_factors": reasons
-        })
+
+            "risk_factors": reasons,
+
+            "created_at": datetime.now()
+        }
+
+
+        # ------------------------------------------
+        # Save Result to MongoDB
+        # ------------------------------------------
+
+        reports_collection.insert_one(result)
+
+
+        # Remove MongoDB internal ObjectId
+        # before returning the result
+
+        result.pop("_id", None)
+
+
+        # ------------------------------------------
+        # Add Result to Response
+        # ------------------------------------------
+
+        results.append(result)
 
 
     return {
         "results": results
+    }
+
+
+# --------------------------------------------------
+# Get All Reports
+# --------------------------------------------------
+
+@app.get("/reports")
+def get_reports():
+
+    reports = list(
+        reports_collection
+        .find(
+            {},
+            {"_id": 0}
+        )
+        .sort(
+            "created_at",
+            -1
+        )
+    )
+
+    return {
+        "reports": reports
+    }
+
+
+# --------------------------------------------------
+# Get Single Report
+# --------------------------------------------------
+
+@app.get("/reports/{report_id}")
+def get_report(report_id: str):
+
+    report = reports_collection.find_one(
+        {
+            "report_id": report_id.strip()
+        },
+        {
+            "_id": 0
+        }
+    )
+
+    if not report:
+
+        return {
+            "message": "Report not found"
+        }
+
+    return report
+
+
+# --------------------------------------------------
+# Delete Single Report
+# --------------------------------------------------
+
+@app.delete("/reports/{report_id}")
+def delete_report(report_id: str):
+
+    result = reports_collection.delete_one(
+        {
+            "report_id": report_id
+        }
+    )
+
+
+    if result.deleted_count == 0:
+
+        return {
+            "message": "Report not found"
+        }
+
+
+    return {
+        "message": f"Report {report_id} deleted successfully"
+    }
+
+
+# --------------------------------------------------
+# Delete All Reports
+# --------------------------------------------------
+
+@app.delete("/reports")
+def delete_all_reports():
+
+    result = reports_collection.delete_many({})
+
+
+    return {
+        "message": "All reports deleted successfully",
+        "deleted_count": result.deleted_count
     }
