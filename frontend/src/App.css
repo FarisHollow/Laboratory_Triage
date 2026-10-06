@@ -364,7 +364,9 @@ button {
 }
 
 
-/* Input unit */
+/* =========================================================
+   INPUT UNIT
+========================================================= */
 
 .field-unit {
   position: relative;
@@ -591,6 +593,9 @@ button {
 
 /* =========================================================
    REPORT QUEUE
+   IMPORTANT:
+   Items are prevented from shrinking.
+   The container scrolls instead.
 ========================================================= */
 
 .report-queue {
@@ -600,10 +605,14 @@ button {
   gap: 8px;
 
   max-height: 375px;
+  min-height: 0;
 
   overflow-y: auto;
+  overflow-x: hidden;
 
-  padding-right: 2px;
+  padding-right: 5px;
+
+  align-items: stretch;
 }
 
 .report-queue::-webkit-scrollbar {
@@ -622,6 +631,11 @@ button {
 .report-queue-item {
   width: 100%;
 
+  /* CRITICAL FIX */
+  flex: 0 0 auto;
+  min-height: max-content;
+  flex-shrink: 0;
+
   padding: 11px 12px;
 
   border: 1px solid #e3e7ed;
@@ -639,12 +653,19 @@ button {
   background: #ffffff;
 }
 
+
+/* =========================================================
+   QUEUE ITEM HEADER
+========================================================= */
+
 .queue-item-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 
   margin-bottom: 9px;
+
+  flex-shrink: 0;
 }
 
 .queue-item-header > div {
@@ -652,6 +673,8 @@ button {
   align-items: center;
 
   gap: 8px;
+
+  min-width: 0;
 }
 
 .queue-label {
@@ -667,6 +690,8 @@ button {
   font-weight: 700;
 
   color: #344054;
+
+  white-space: nowrap;
 }
 
 .queue-remove {
@@ -676,6 +701,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
+
+  flex-shrink: 0;
 
   border: none;
   border-radius: 5px;
@@ -711,6 +738,10 @@ button {
   border-top: 1px solid #edf0f3;
 
   padding-top: 8px;
+
+  min-height: max-content;
+
+  flex-shrink: 0;
 }
 
 .queue-values > div {
@@ -747,6 +778,8 @@ button {
   font-weight: 650;
 
   color: #344054;
+
+  white-space: nowrap;
 }
 
 
@@ -883,6 +916,9 @@ button {
 
 /* =========================================================
    TRIAGE RESULTS
+   IMPORTANT:
+   Result cards are NEVER allowed to shrink.
+   The result-list itself becomes scrollable.
 ========================================================= */
 
 .result-list {
@@ -892,10 +928,14 @@ button {
   gap: 9px;
 
   max-height: 475px;
+  min-height: 0;
 
   overflow-y: auto;
+  overflow-x: hidden;
 
-  padding-right: 2px;
+  padding-right: 5px;
+
+  align-items: stretch;
 }
 
 .result-list::-webkit-scrollbar {
@@ -911,10 +951,20 @@ button {
   border-radius: 10px;
 }
 
+
+/* =========================================================
+   RESULT CARD
+========================================================= */
+
 .small-result-card {
   position: relative;
 
   width: 100%;
+
+  /* CRITICAL FIX */
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  min-height: max-content;
 
   padding: 12px;
 
@@ -953,7 +1003,9 @@ button {
 }
 
 
-/* Result header */
+/* =========================================================
+   RESULT HEADER
+========================================================= */
 
 .small-result-top {
   display: flex;
@@ -963,6 +1015,8 @@ button {
   gap: 10px;
 
   padding-left: 4px;
+
+  flex-shrink: 0;
 }
 
 .small-result-top > div:first-child {
@@ -970,6 +1024,8 @@ button {
   align-items: center;
 
   gap: 8px;
+
+  min-width: 0;
 }
 
 .small-result-top > div:first-child span {
@@ -984,10 +1040,14 @@ button {
   font-size: 12px;
 
   color: #344054;
+
+  white-space: nowrap;
 }
 
 
-/* Result status */
+/* =========================================================
+   RESULT STATUS
+========================================================= */
 
 .small-status {
   display: inline-flex;
@@ -996,6 +1056,8 @@ button {
   gap: 5px;
 
   padding: 4px 8px;
+
+  flex-shrink: 0;
 
   border-radius: 5px;
 
@@ -1038,7 +1100,9 @@ button {
 }
 
 
-/* Prediction */
+/* =========================================================
+   PREDICTION
+========================================================= */
 
 .prediction-row {
   display: grid;
@@ -1051,6 +1115,8 @@ button {
 
   border-top: 1px solid #edf0f4;
   border-bottom: 1px solid #edf0f4;
+
+  flex-shrink: 0;
 }
 
 .prediction-row > div {
@@ -1096,6 +1162,8 @@ button {
 
 .result-values {
   margin: 10px 4px 0;
+
+  flex-shrink: 0;
 }
 
 .result-section-title {
@@ -1122,6 +1190,8 @@ button {
   border-radius: 5px;
 
   overflow: hidden;
+
+  min-height: max-content;
 }
 
 .result-value-grid > div {
@@ -1155,6 +1225,8 @@ button {
   font-weight: 650;
 
   color: #475467;
+
+  white-space: nowrap;
 }
 
 
@@ -1164,6 +1236,8 @@ button {
 
 .result-risks {
   margin: 10px 4px 0;
+
+  flex-shrink: 0;
 }
 
 .result-risk {
@@ -1759,7 +1833,17 @@ button {
 
   .report-queue,
   .result-list {
+    /*
+      On smaller screens, let the page grow naturally
+      instead of forcing an internal fixed-height scroll.
+    */
     max-height: none;
+    overflow-y: visible;
+  }
+
+  .report-queue-item,
+  .small-result-card {
+    flex-shrink: 0;
   }
 }
 
@@ -1810,6 +1894,14 @@ button {
   }
 
   .queue-values > div:nth-child(3) {
+    border-right: none;
+  }
+
+  .queue-values > div:nth-child(4) {
+    border-right: 1px solid #edf0f3;
+  }
+
+  .queue-values > div:nth-child(6) {
     border-right: none;
   }
 
